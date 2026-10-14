@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	NonModifiableFieldsForNonAdmin = []string{"Username", "Scope", "LockPassword", "Perm", "Commands", "Rules"}
+	NonModifiableFieldsForNonAdmin = []string{"Username", "Scope", "LockPassword", "Perm", "Rules"}
 )
 
 type modifyUserRequest struct {
@@ -190,7 +190,6 @@ var userPutHandler = withSelfOrAdmin(func(w http.ResponseWriter, r *http.Request
 			"password":     {},
 			"scope":        {},
 			"lockPassword": {},
-			"commands":     {},
 			"perm":         {},
 		}
 
