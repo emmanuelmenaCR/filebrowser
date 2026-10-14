@@ -88,3 +88,4 @@ Documento de seguimiento de tareas, optimizaciones y mejoras arquitectónicas pa
   - **Diagnóstico:** Se utiliza la librería externa `gorilla/mux`. Desde Go 1.22, el enrutador estándar `net/http` incluye soporte nativo para métodos y coincidencia de patrones en rutas.
   - **Propuesta de solución:**
     - Reemplazar `gorilla/mux` por `net/http.ServeMux` nativo o un router ultraligero y mantenido como `chi`, reduciendo dependencias externas.
+

@@ -1,32 +1,55 @@
 services:
   filebrowser:
     container_name: filebrowser
-    image: filebrowser/filebrowser:latest
+    build: .
+    image: filebrowser:latest
+    restart: unless-stopped
     networks:
-      - filebrowser
-    ports:
-      - 8000:80
+      - filebrowser_net
+    expose:
+      - 80
     volumes:
-      - filebrowser:/flux/vault
-    environment:
-      - FB_REDIS_CACHE_URL=redis://default:filebrowser@redis:6379 # Use rediss:// for ssl
+      - filebrowser_srv:/srv
+      - filebrowser_config:/config
+      - filebrowser_database:/database
 
-  redis:
-    container_name: redis
-    image: redis:latest
+  nginx:
+    container_name: filebrowser_nginx
+    image: nginx:alpine
+    restart: unless-stopped
     networks:
+      - filebrowser_net
+    ports:
+      - "80:80"       # Cambia a "8000:80" si prefieres el puerto 8000 en el host
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
       - filebrowser
-    command:
-      - sh
-      - -c
-      - |
-        cat > /tmp/users.acl <<EOF
-        user default on >filebrowser ~* +@all
-        EOF
-        redis-server --aclfile /tmp/users.acl
+
+  fail2ban:
+    container_name: filebrowser_fail2ban
+    image: crazymax/fail2ban:latest
+    restart: unless-stopped
+    network_mode: "host"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./nginx/logs:/var/log/nginx:ro
+      - ./fail2ban/jail.d:/etc/fail2ban/jail.d:ro
+      - ./fail2ban/filter.d:/etc/fail2ban/filter.d:ro
+      - fail2ban_data:/data
+    depends_on:
+      - nginx
 
 networks:
-  filebrowser:
+  filebrowser_net:
+    driver: bridge
 
 volumes:
-  filebrowser:
+  filebrowser_srv:
+  filebrowser_config:
+  filebrowser_database:
+  fail2ban_data:
