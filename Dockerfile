@@ -1,4 +1,32 @@
-## Multistage build: First stage fetches dependencies
+# Stage 1: Build frontend assets
+FROM node:24-alpine AS frontend-builder
+WORKDIR /app/frontend
+
+RUN npm install -g pnpm@10.33.4
+
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY frontend/ ./
+RUN pnpm run build
+
+# Stage 2: Build backend binary
+FROM golang:1.25-alpine AS backend-builder
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+
+ARG VERSION=dev
+ARG COMMIT_SHA=docker
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -a -ldflags="-s -w -X 'github.com/filebrowser/filebrowser/v2/version.Version=${VERSION}' -X 'github.com/filebrowser/filebrowser/v2/version.CommitSHA=${COMMIT_SHA}'" \
+    -o /bin/filebrowser .
+
+# Stage 3: Fetch runtime dependencies
 FROM alpine:3.23 AS fetcher
 
 # install and copy ca-certificates, mailcap, and tini-static; download JSON.sh
@@ -6,7 +34,7 @@ RUN apk update && \
     apk --no-cache add ca-certificates mailcap tini-static && \
     wget -O /JSON.sh https://raw.githubusercontent.com/dominictarr/JSON.sh/0d5e5c77365f63809bf6e77ef44a1f34b0e05840/JSON.sh
 
-## Second stage: Use lightweight BusyBox image for final runtime environment
+# Stage 4: Lightweight BusyBox image for final runtime environment
 FROM busybox:1.37.0-musl
 
 # Define non-root user UID and GID
@@ -18,7 +46,7 @@ RUN addgroup -g $GID user && \
     adduser -D -u $UID -G user user
 
 # Copy binary, scripts, and configurations into image with proper ownership
-COPY --chown=user:user filebrowser /bin/filebrowser
+COPY --chown=user:user --from=backend-builder /bin/filebrowser /bin/filebrowser
 COPY --chown=user:user docker/common/ /
 COPY --chown=user:user docker/alpine/ /
 COPY --chown=user:user --from=fetcher /sbin/tini-static /bin/tini
